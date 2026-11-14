@@ -1,0 +1,2 @@
+# NO MODIFICAR
+SEPARADOR = ";"

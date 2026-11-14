@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "opencode": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "github:ddzendreros/mcp-agent-bridges", "opencode"],
+      "env": {
+        "OPENCODE_BRIDGE_MODEL": "opencode/deepseek-v4.1-flash-free"
+      }
+    },
+    "cursor": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "github:ddzendreros/mcp-agent-bridges", "cursor"],
+      "env": {}
+    },
+    "antigravity": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "github:ddzendreros/mcp-agent-bridges", "antigravity"],
+      "env": {}
+    },
+    "codex": {
+      "type": "stdio",
+      "command": "codex",
+      "args": ["mcp-server"],
+      "env": {}
+    }
+  }
+}

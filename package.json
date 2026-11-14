@@ -1,0 +1,27 @@
+{
+  "name": "mcp-agent-bridges",
+  "version": "1.0.0",
+  "description": "Zero-dependency MCP servers that let Claude Code (or any MCP client) delegate coding tasks to OpenCode, Cursor CLI and Antigravity CLI through one consistent interface.",
+  "type": "module",
+  "bin": {
+    "mcp-agent-bridges": "bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "packages/*/server.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["mcp", "model-context-protocol", "claude-code", "opencode", "cursor", "cursor-agent", "antigravity", "agents", "orchestration"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ddzendreros/mcp-agent-bridges.git"
+  },
+  "license": "MIT"
+}

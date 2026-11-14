@@ -1,0 +1,31 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [18, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --check packages/opencode-bridge/server.mjs
+      - run: node --check packages/cursor-bridge/server.mjs
+      - run: node --check packages/antigravity-bridge/server.mjs
+      - run: npm test
+  judge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Untouched task scores 8/23
+        run: python benchmark/inventory/judge.py benchmark/inventory/task | head -1 | grep -qx "8/23"
