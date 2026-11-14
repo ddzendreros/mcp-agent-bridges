@@ -1,53 +1,100 @@
-<div align="center">
+<p align="center">
+  <img src="assets/banner.svg" alt="mcp-agent-bridges — one orchestrator plans and reviews, other coding agents do the typing" width="100%">
+</p>
 
-# mcp-agent-bridges
+<p align="center">
+  <a href="https://github.com/ddzendreros/mcp-agent-bridges/actions/workflows/ci.yml"><img src="https://github.com/ddzendreros/mcp-agent-bridges/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white" alt="Node 18+">
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="Zero dependencies">
+  <img src="https://img.shields.io/badge/MCP-stdio-8A2BE2" alt="MCP stdio">
+  <img src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational" alt="Linux, macOS, Windows">
+</p>
 
-**Let Claude Code plan and review while OpenCode, Cursor and Antigravity do the typing.**
-
-Three zero-dependency MCP servers that put other coding agents' CLIs behind one consistent tool interface, so an orchestrating agent can delegate work, switch models per call and verify what comes back.
-
-[![CI](https://github.com/ddzendreros/mcp-agent-bridges/actions/workflows/ci.yml/badge.svg)](https://github.com/ddzendreros/mcp-agent-bridges/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Node 18+](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white)
-![Zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
-![MCP](https://img.shields.io/badge/MCP-stdio-8A2BE2)
-
-[Quick start](#quick-start) · [Results](#benchmark) · [Interface](#one-interface-for-every-agent) · [Configuration](docs/configuration.md) · [Limitations](#limitations) · [Español](README.es.md)
-
-</div>
+<p align="center">
+  <b><a href="#-quick-start">Quick start</a></b> ·
+  <b><a href="#-benchmark">Benchmark</a></b> ·
+  <b><a href="#-one-interface">Interface</a></b> ·
+  <b><a href="docs/configuration.md">Configuration</a></b> ·
+  <b><a href="#%EF%B8%8F-limitations">Limitations</a></b> ·
+  <b><a href="README.es.md">Español</a></b>
+</p>
 
 ---
 
-## The problem
+**mcp-agent-bridges** is a set of three small MCP servers that let **Claude Code** (or any MCP client) hand coding work to **OpenCode**, **Cursor CLI** and **Antigravity CLI**, and get back a short, uniform report it can verify.
 
-Claude Code is very good at understanding a codebase, deciding what to do and checking the result. Spending its context and tokens on typing boilerplate, repetitive refactors or test files is wasteful, especially when you already pay for (or have free access to) other coding agents.
+The orchestrator keeps the expensive part: understanding the codebase, deciding and reviewing. The delegates do the mechanical part (the code, the tests, the boilerplate), often with cheaper or free models.
 
-Those agents all have headless CLIs, but each speaks its own flags, output format and permission model, and a few have platform quirks that break them when run from another program. **mcp-agent-bridges** wraps each CLI in a small MCP server so the orchestrator sees the same tool shape and the same compact report every time.
+## ✨ Why
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 🔌 One interface
+`prompt`, `cwd`, `model`, `fallback_models`, `session_id` and `timeout_s` on every bridge, and the same report back. Switch delegates without relearning flags.
+
+</td>
+<td width="33%" valign="top">
+
+### 🧾 Reports you can check
+Files edited, every command with ✓ / ✗ and its exit code, tokens and cost when available. The raw event stream goes to a local log you can turn off.
+
+</td>
+<td width="33%" valign="top">
+
+### 🛡️ Safe defaults
+Antigravity runs in `accept-edits` and only executes commands you allow-list **exactly**, for that task only. Nothing is written to the tools' own settings.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+### 🔁 Model per call
+Choose the model on every call and give an ordered list of fallbacks: on error (OpenCode), when a model is not on your plan (Cursor), or on usage/capacity limits (Antigravity).
+
+</td>
+<td valign="top">
+
+### 🪟 Works on Windows
+Fixes for issues found in daily use: multi-line prompts cut by `cmd.exe`, `cursor-agent` failing with *"Can't find Bash"*, OpenCode resolving paths in the wrong folder.
+
+</td>
+<td valign="top">
+
+### 📦 Zero dependencies
+Each bridge is a single readable `server.mjs`. Run it with `npx` straight from GitHub, or with `node` from a clone.
+
+</td>
+</tr>
+</table>
+
+## 🧭 How a delegation works
 
 ```mermaid
-flowchart LR
-    U([You]) --> C["Claude Code<br/><sub>plans · decides · verifies</sub>"]
-    C -- "opencode_task" --> O["opencode-bridge"] --> O2["OpenCode CLI"]
-    C -- "cursor_task" --> K["cursor-bridge"] --> K2["cursor-agent"]
-    C -- "antigravity_task" --> A["antigravity-bridge"] --> A2["Antigravity CLI"]
-    C -. "codex (official server)" .-> X["codex mcp-server"]
-    O2 & K2 & A2 & X --> W[("your repo")]
+sequenceDiagram
+    autonumber
+    actor You
+    participant C as Claude Code
+    participant B as bridge (MCP)
+    participant A as agent CLI
+    You->>C: "Add tests for the parser"
+    C->>C: plan the change, write a self-contained task
+    C->>B: opencode_task { prompt, cwd, model }
+    B->>A: opencode run --format json ...
+    A-->>B: event stream (edits, commands, answer)
+    B-->>C: status · files_edited · commands ✓/✗ · final answer
+    C->>C: read the diff, run the tests
+    C-->>You: verified result
 ```
 
-## Highlights
+## 🚀 Quick start
 
-- **One interface** — `prompt`, `cwd`, `model`, `fallback_models`, `session_id`, `timeout_s` on every bridge; the same `status / files_edited / commands / final answer` report back.
-- **Pick the model per call** — no need to edit each tool's config to switch models.
-- **Compact reports, full logs** — the orchestrator gets a short summary (with ✓/✗ for every command the agent ran); the raw event stream goes to a local log file you can turn off.
-- **Safe defaults** — Antigravity runs in `accept-edits` and only executes commands you allow-list **exactly**, for that task only. Nothing is written to the tools' own settings.
-- **Windows-ready** — fixes we hit in practice: multi-line prompts cut by `cmd.exe`, `cursor-agent` failing with *"Can't find Bash"*, OpenCode resolving paths against the wrong folder.
-- **Zero dependencies** — each bridge is a single `server.mjs` file you can read in a few minutes.
+**1. Install the agents you want** and log in to each one: [OpenCode](https://opencode.ai), [Cursor CLI](https://cursor.com/cli), Antigravity CLI. You also need **Node.js 18+**.
 
-## Quick start
-
-**1.** Install and log in to the CLIs you want to use: [OpenCode](https://opencode.ai), [Cursor CLI](https://cursor.com/cli), Antigravity CLI. You need Node.js 18+.
-
-**2.** Register the bridges with Claude Code:
+**2. Register the bridges** with Claude Code:
 
 ```bash
 claude mcp add opencode    --scope user -- npx -y github:ddzendreros/mcp-agent-bridges opencode
@@ -55,16 +102,25 @@ claude mcp add cursor      --scope user -- npx -y github:ddzendreros/mcp-agent-b
 claude mcp add antigravity --scope user -- npx -y github:ddzendreros/mcp-agent-bridges antigravity
 ```
 
-**3.** Restart Claude Code and ask it to delegate:
+**3. Restart Claude Code and delegate:**
 
-> *Use opencode_task with model opencode/deepseek-v4.1-flash-free to add unit tests for `src/parser.ts`, run them, and then review the diff.*
-
-Prefer a local clone, or using another MCP client? See [docs/configuration.md](docs/configuration.md) for `node`-path setup, a ready-made [`.claude.json` example](examples/claude.json.example) and every environment variable.
+> *Use opencode_task with model opencode/deepseek-v4.1-flash-free to add unit tests for `src/parser.ts` and run them. Then review the diff yourself.*
 
 <details>
-<summary><b>Adding Codex too</b> (official server, not part of this repo)</summary>
+<summary><b>Other ways to install</b> (clone, manual config, other MCP clients)</summary>
 
-Codex already ships an MCP server, made by OpenAI. This repo does not wrap or modify it; it is only included in the benchmark as a reference point.
+```bash
+git clone https://github.com/ddzendreros/mcp-agent-bridges.git
+claude mcp add opencode --scope user -- node /path/to/mcp-agent-bridges/packages/opencode-bridge/server.mjs
+```
+
+Or edit `~/.claude.json` by hand using [`examples/claude.json.example`](examples/claude.json.example). Any MCP client that speaks stdio can use the same entries. All environment variables are in [docs/configuration.md](docs/configuration.md).
+</details>
+
+<details>
+<summary><b>Adding Codex</b> (official OpenAI server, not part of this repo)</summary>
+
+Codex already ships its own MCP server. This repo does not wrap or modify it; it only appears in the benchmark as a reference point.
 
 ```bash
 claude mcp add codex --scope user -- codex mcp-server
@@ -73,108 +129,121 @@ claude mcp add codex --scope user -- codex mcp-server
 Pass `model` on every call (the server ignores `-c model=...`), and use `sandbox: "workspace-write"` with `approval-policy: "never"` for unattended edits.
 </details>
 
-## Benchmark
+## 📊 Benchmark
 
-Same task, same prompt, two models per tool, scored by a **hidden judge** the agents never saw: fix 9 planted bugs to match a spec, implement a missing function, write and run at least 6 tests, and leave two protected files untouched. The untouched project scores 8/23.
+Same task and prompt for everyone, two models per tool, scored by a **hidden judge** with 23 checks that the agents never saw. The task: fix 9 planted bugs to match a spec, implement a missing function, write and run at least 6 tests, and leave two protected files untouched. The untouched project scores 8/23.
 
 | Tool | Model | Time | Ran its own tests | Hidden judge |
-|---|---|---:|:---:|:---:|
-| Codex¹ | gpt-5.6-sol | n/a | ✓ | **23/23** |
-| Codex¹ | gpt-5.6-luna | n/a | ✓ | **23/23** |
-| OpenCode | deepseek-v4.1-flash-free | 84 s | ✓ | **23/23** |
-| OpenCode | nemotron-3.5-lightning-free | 151 s | ✓ | **23/23** |
-| Cursor | auto | **34 s** | ✓ | **23/23** |
-| Cursor | grok-4.7-medium | 77 s | ✓ | **23/23** |
-| Antigravity | gemini-3.8-flash-medium | 511 s | ✓² | **23/23** |
-| Antigravity | gemini-3.8-flash-low | 167 s | ✓² | **23/23** |
+|:--|:--|--:|:--:|:--:|
+| Codex¹ | gpt-5.6-sol | n/a | ✅ | **23/23** |
+| Codex¹ | gpt-5.6-luna | n/a | ✅ | **23/23** |
+| OpenCode | deepseek-v4.1-flash-free | 84 s | ✅ | **23/23** |
+| OpenCode | nemotron-3.5-lightning-free | 151 s | ✅ | **23/23** |
+| Cursor | auto | **34 s** | ✅ | **23/23** |
+| Cursor | grok-4.7-medium | 77 s | ✅ | **23/23** |
+| Antigravity | gemini-3.8-flash-medium | 511 s | ✅² | **23/23** |
+| Antigravity | gemini-3.8-flash-low | 167 s | ✅² | **23/23** |
 
-<sub>¹ Official `codex mcp-server`, which does not report timing. ² With the test command passed in `allow_commands`. One run per configuration on a Windows laptop, 2026-11-14: times are indicative. Reproduce it with [`benchmark/`](benchmark/).</sub>
+```mermaid
+xychart-beta
+    title "Time to finish the task (seconds, lower is better)"
+    x-axis ["Cursor auto", "Cursor grok-4.7", "OpenCode deepseek", "OpenCode nemotron", "Antigravity flash-low", "Antigravity flash-med"]
+    y-axis "seconds" 0 --> 550
+    bar [34, 77, 84, 151, 167, 511]
+```
 
-**Takeaways.** All of them solved it; the differences are speed, cost and how easy the result is to verify.
+<sub>¹ Official `codex mcp-server`, which does not report timing. ² With the test command passed in `allow_commands`. One run per configuration on a Windows laptop, 2026-11-14, so times are indicative. Details and a release check of this exact code: [benchmark/RESULTS.md](benchmark/RESULTS.md). Run it yourself with [benchmark/](benchmark/).</sub>
 
-| Use | For | Because |
-|---|---|---|
-| Codex | important or tricky changes | strongest models, honest short reports, keeps the conversation for follow-ups |
-| OpenCode | volume and mechanical work | $0 with free models, the most detailed report, automatic model fallback |
-| Cursor | quick tasks | fastest in the test with `auto` |
-| Antigravity | backup | correct but slow, and limited by usage quotas |
+### Which one to use
 
-## One interface for every agent
+| | Best for | Why |
+|:--|:--|:--|
+| 🥇 **Codex** | important or tricky changes | strongest models, short honest reports, keeps the thread for follow-ups |
+| 💸 **OpenCode** | volume and mechanical work | $0 with free models, the most detailed report, automatic model fallback |
+| ⚡ **Cursor** | quick tasks | fastest in the test with `auto` |
+| 🧯 **Antigravity** | backup | correct but slow, and bound by usage quotas |
+
+Every configuration solved the task. What differs is speed, cost and how easy the result is to verify.
+
+## 🔌 One interface
 
 | | `opencode_task` | `cursor_task` | `antigravity_task` |
-|---|:---:|:---:|:---:|
-| `prompt`, `cwd`, `model`, `timeout_s` | ✓ | ✓ | ✓ |
-| `session_id` (follow-ups) | ✓ | ✓ | ✓ |
-| `fallback_models` | on error | on model unavailable | on usage/capacity limit |
+|:--|:--:|:--:|:--:|
+| `prompt` · `cwd` · `model` · `timeout_s` | ✅ | ✅ | ✅ |
+| `session_id` (follow-ups) | ✅ | ✅ | ✅ |
+| `fallback_models` triggers on | error | model not on plan | usage / capacity limit |
 | read-only mode | `agent: "plan"` | `mode: "plan"` / `"ask"` | `mode: "plan"` |
-| `allow_commands`, `max_recoveries` | — | — | ✓ |
+| `allow_commands` · `max_recoveries` | — | — | ✅ |
 | list models | — | `cursor_models` | `antigravity_models` |
 
-A typical report (trimmed; the agent's answer translated from Spanish):
+Every call returns the same kind of report:
 
 ```text
-status: ok (exit 0, 34s)
+status: ok (exit 0, 57s)
 session_id: 3f2a9c1e-5b7d-4e8a-9c0f-1d2e3f4a5b6c
 model: Auto
+attempts: claude-opus-5-5-high: not available for this account → auto: ok
 files_edited: /work/inventario.py, /work/tests/test_nuevo.py
 tools: read×4, glob×1, edit×2, shell×1
 commands:
   ✓ python -m unittest discover -s tests -t . (exit 0 → OK)
-log: ~/.mcp-agent-bridges/logs/cursor/2026-11-14T15-53-39-535Z_3f2a9c1e.jsonl
+log: ~/.mcp-agent-bridges/logs/cursor/2026-11-14T16-43-47-988Z_3f2a9c1e.jsonl
 --- final answer ---
-Fixed parse_linea (strip, upper-case SKU, comma decimals, validation) ... 9 tests OK.
+Fixed normalization, validation and de-duplication, implemented reabastecer,
+added 6 tests. python -m unittest discover -s tests -t . → 7 tests OK.
 ```
 
-Full reference: [docs/interface.md](docs/interface.md).
+<sub>Trimmed; the agent's answer is translated from Spanish.</sub> Full reference: [docs/interface.md](docs/interface.md).
 
-## Teach Claude when to delegate
+## ⚠️ Limitations
 
-[`skills/delegate-coding-tasks`](skills/delegate-coding-tasks/SKILL.md) is an optional Claude Code skill that tells the orchestrator what to delegate, which bridge to pick, how to write a self-contained task and how to verify the result. Copy the folder into `~/.claude/skills/` to use it.
+Honest notes from daily use:
 
-## Limitations
+| | |
+|:--|:--|
+| 🐢 **Antigravity is slow and quota-bound** | It was the slowest in every run (up to ~8.5 min on a small task), and its models have per-account usage limits. When a limit is hit, or the server answers that it has no capacity, the bridge reports it. It only switches to other models of the same account if you set `fallback_models`. |
+| 🔒 **Antigravity runs no commands by default** | In `accept-edits` mode every command is denied. Only exact strings in `allow_commands` run (no wildcards). Pass the exact test command if you want it to check its own work. |
+| 🎟️ **Cursor Free plan** | It lists many models, but only `auto` and the Grok models actually run. Requests for other models fall back to `auto`, and the report says so. |
+| 🧾 **The report is a summary** | It is parsed from each CLI's event stream, whose format can change between versions. Always check the diff and run the tests. |
+| ⏱️ **No real parallelism** | Claude Code tends to run calls to different MCP servers one after another. |
+| 🪟 **Windows-first testing** | CI runs on Linux, macOS and Windows, but the end-to-end runs with the real CLIs were done on Windows 11. |
 
-Honest notes from using these daily:
+> [!IMPORTANT]
+> This project does not include, and will not accept, anything that rotates accounts or gets around a provider's plan limits or terms of use.
 
-- **Antigravity is slow and quota-bound.** It was the slowest in every run (up to ~8.5 min on a small task), and its models have usage limits per account. When a limit is hit (or the server answers that it has no capacity) the bridge reports it, and it only switches to other models of the same account if you configure `fallback_models`.
-- **Antigravity cannot run commands by default.** In `accept-edits` mode any command is denied; only exact strings in `allow_commands` are allowed (no wildcards). The bridge resumes the conversation after a blocked command, but give it the exact verification command if you want it to test its work.
-- **Cursor on the Free plan** lists many models, but only `auto` and Grok models actually run. Requests for other models fall back to `auto` and the report says so.
-- **The report is a summary.** It is parsed from each CLI's event stream, whose format can change between CLI versions. Always check the diff and run the tests yourself.
-- **No real parallelism.** Claude Code tends to run calls to different MCP servers one after another.
-- **Windows-first testing.** The bridges are built to be cross-platform and CI runs on Linux, macOS and Windows, but end-to-end runs with the real CLIs were done on Windows 11.
+## 🔍 Prior art
 
-This project does not include, and will not accept, anything to rotate accounts or get around a provider's plan limits or terms of use.
+Other projects wrap one of these CLIs as an MCP server and are worth a look: [claude-opencode-mcp](https://github.com/putuandy/claude-opencode-mcp), [opencode-mcp](https://github.com/AlaeddineMessadi/opencode-mcp), [cursor-agent-mcp](https://github.com/sailay1996/cursor-agent-mcp), [cursormcp](https://github.com/sitien173/cursormcp), [gemini-mcp-tool](https://github.com/jamubc/gemini-mcp-tool), [Claude-Code-Antigravity-CLI-MCP-Server](https://github.com/SinanTufekci/Claude-Code-Antigravity-CLI-MCP-Server) and [all-agents-mcp](https://github.com/dokkabei97/all-agents-mcp).
 
-## Prior art
-
-Several projects wrap one of these CLIs as an MCP server, for example [claude-opencode-mcp](https://github.com/putuandy/claude-opencode-mcp), [opencode-mcp](https://github.com/AlaeddineMessadi/opencode-mcp), [cursor-agent-mcp](https://github.com/sailay1996/cursor-agent-mcp), [cursormcp](https://github.com/sitien173/cursormcp), [gemini-mcp-tool](https://github.com/jamubc/gemini-mcp-tool), [Claude-Code-Antigravity-CLI-MCP-Server](https://github.com/SinanTufekci/Claude-Code-Antigravity-CLI-MCP-Server) and [all-agents-mcp](https://github.com/dokkabei97/all-agents-mcp). They are worth a look. This repo's focus is narrower:
-
-- the **same parameters and report** across three different CLIs, built for an orchestrator that verifies results;
-- **per-call model choice with fallbacks** and **exact-command allow-listing** for Antigravity;
+What this repo focuses on:
+- the **same parameters and report** across three different CLIs, designed for an orchestrator that verifies results;
+- **per-call model choice with fallbacks**, and **exact-command allow-listing** for Antigravity;
 - a **reproducible benchmark** with a hidden judge.
 
-## Repository layout
+## 🗂️ Repository layout
 
 ```text
 packages/
-  opencode-bridge/server.mjs      MCP server for OpenCode
-  cursor-bridge/server.mjs        MCP server for Cursor CLI
-  antigravity-bridge/server.mjs   MCP server for Antigravity CLI
-bin/cli.mjs                       `npx ... <opencode|cursor|antigravity>` entry point
-benchmark/                        task, hidden judge, prompt and results
-skills/delegate-coding-tasks/     optional Claude Code skill
-docs/                             configuration and interface reference
-examples/claude.json.example      ready-made MCP config
-test/                             smoke tests (no real CLI needed)
+├── opencode-bridge/server.mjs      MCP server for OpenCode
+├── cursor-bridge/server.mjs        MCP server for Cursor CLI
+└── antigravity-bridge/server.mjs   MCP server for Antigravity CLI
+bin/cli.mjs                         npx entry point: <opencode|cursor|antigravity>
+benchmark/                          task, hidden judge, prompt and results
+docs/                               configuration and interface reference
+examples/claude.json.example        ready-made MCP config
+test/                               smoke tests (no real CLI needed)
 ```
 
-## Development
+## 🛠️ Development
 
 ```bash
-npm test     # starts each bridge over stdio and checks the handshake, schemas and error handling
+npm test   # starts each bridge over stdio and checks the handshake, the schemas and the error handling
 ```
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
 
-## License
+## 📄 License
 
-[MIT](LICENSE) © Diego Zendreros. OpenCode, Cursor, Antigravity, Codex and Claude are trademarks of their respective owners; this project is not affiliated with or endorsed by any of them.
+[MIT](LICENSE) © Diego Zendreros
+
+<sub>OpenCode, Cursor, Antigravity, Codex and Claude are trademarks of their respective owners. This project is not affiliated with or endorsed by any of them.</sub>

@@ -7,4 +7,3 @@ First public release.
 - `npx github:ddzendreros/mcp-agent-bridges <bridge>` entry point.
 - Configurable log folder (`*_BRIDGE_LOGS`, `off` to disable).
 - Reproducible `inventory` benchmark with a hidden judge.
-- Optional Claude Code skill `delegate-coding-tasks`.
