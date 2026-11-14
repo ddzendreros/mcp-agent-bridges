@@ -1,0 +1,9 @@
+{"type":"step_start","timestamp":1,"sessionID":"ses_test1","part":{"id":"prt_1","sessionID":"ses_test1","messageID":"msg_1","type":"step-start"}}
+{"type":"tool_use","timestamp":2,"sessionID":"ses_test1","part":{"sessionID":"ses_test1","type":"tool","tool":"read","state":{"status":"completed","input":{"path":"/work/spec.md"},"output":"Read file /work/spec.md"}}}
+{"type":"tool_use","timestamp":3,"sessionID":"ses_test1","part":{"sessionID":"ses_test1","type":"tool","tool":"edit","state":{"status":"completed","input":{"path":"/work/app.py","oldString":"a","newString":"b"},"output":"Edited app.py"}}}
+{"type":"tool_use","timestamp":4,"sessionID":"ses_test1","part":{"sessionID":"ses_test1","type":"tool","tool":"write","state":{"status":"completed","input":{"path":"/work/tests/test_app.py","content":"import unittest"},"output":"Created file"}}}
+{"type":"tool_use","timestamp":5,"sessionID":"ses_test1","part":{"sessionID":"ses_test1","type":"tool","tool":"shell","state":{"status":"completed","input":{"command":"python -m unittest"},"output":"FAILED (failures=1)\n","metadata":{"metadata":{"status":"completed","exit":1},"content":[{"type":"text","text":"Ran 3 tests\n\nFAILED (failures=1)\n"}]}}}}
+{"type":"tool_use","timestamp":6,"sessionID":"ses_test1","part":{"sessionID":"ses_test1","type":"tool","tool":"shell","state":{"status":"completed","input":{"command":"python -m unittest"},"output":"OK\n","metadata":{"metadata":{"status":"completed","exit":0},"content":[{"type":"text","text":"Ran 3 tests\n\nOK\n"}]}}}}
+{"type":"step_finish","timestamp":7,"sessionID":"ses_test1","part":{"sessionID":"ses_test1","type":"step-finish","reason":"stop","cost":0.0125,"tokens":{"input":100,"output":20,"reasoning":5,"cache":{"read":300,"write":0}}}}
+{"type":"text","timestamp":8,"sessionID":"ses_test1","part":{"sessionID":"ses_test1","type":"text","text":"Fixed app.py and added 3 tests. All pass."}}
+not json, ignored

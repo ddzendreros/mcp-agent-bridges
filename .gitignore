@@ -1,6 +1,7 @@
 # Bridge logs can contain prompts, file paths, source code and account details — never commit them.
 logs/
 *.jsonl
+!test/fixtures/*.jsonl
 # Local backups
 *.bak
 *.bak-*

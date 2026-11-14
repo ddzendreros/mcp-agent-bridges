@@ -1,0 +1,8 @@
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/work","session_id":"cur-test-1","model":"Auto","permissionMode":"default"}
+{"type":"tool_call","subtype":"started","tool_call":{"readToolCall":{"args":{"path":"/work/spec.md"}}},"session_id":"cur-test-1"}
+{"type":"tool_call","subtype":"started","tool_call":{"editToolCall":{"args":{"path":"/work/app.py","streamContent":"x"}}},"session_id":"cur-test-1"}
+{"type":"tool_call","subtype":"completed","tool_call":{"shellToolCall":{"args":{"command":"python -m unittest"},"result":{"success":{"exitCode":1,"stdout":"","stderr":"FAILED (failures=1)\n","interleavedOutput":"Ran 3 tests\nFAILED (failures=1)\n"}}}},"session_id":"cur-test-1"}
+{"type":"tool_call","subtype":"completed","tool_call":{"shellToolCall":{"args":{"command":"git push --force"},"result":{"rejected":{"reason":"not allowed"}}}},"session_id":"cur-test-1"}
+{"type":"tool_call","subtype":"completed","tool_call":{"shellToolCall":{"args":{"command":"python -m unittest"},"result":{"success":{"exitCode":0,"stdout":"","stderr":"OK\n","interleavedOutput":"Ran 3 tests\nOK\n"}}}},"session_id":"cur-test-1"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"partial text"}]},"session_id":"cur-test-1"}
+{"type":"result","subtype":"success","duration_ms":1000,"is_error":false,"result":"Fixed app.py. Tests pass.","session_id":"cur-test-1"}

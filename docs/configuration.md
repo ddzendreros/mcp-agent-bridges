@@ -47,7 +47,7 @@ All are optional.
 | `OPENCODE_BRIDGE_FALLBACKS` | opencode | none | Comma-separated fallback models |
 | `OPENCODE_BRIDGE_LOGS` | opencode | `~/.mcp-agent-bridges/logs/opencode` | Log folder, or `off` |
 | `OPENCODE_BRIDGE_MAX_CHARS` | opencode | `4000` | Max characters of the final answer returned |
-| `CURSOR_AGENT_BIN` | cursor | auto-detected, else `cursor-agent` | Path to `cursor-agent` |
+| `CURSOR_AGENT_BIN` | cursor | auto-detected, else `cursor-agent` | Path to `cursor-agent`. On Windows, point it to the `cursor-agent.cmd` inside the install folder: the bridge then finds `versions\<latest>\node.exe` next to it and starts that directly, so multi-line prompts arrive intact. Any other launcher goes through `cmd.exe`, which flattens line breaks |
 | `CURSOR_BRIDGE_MODEL` | cursor | `auto` | Default model |
 | `CURSOR_BRIDGE_FALLBACKS` | cursor | `auto` | Fallbacks when a model is not available on your plan |
 | `CURSOR_BRIDGE_GIT_BASH_DIR` | cursor | auto-detected | Folder that holds Git Bash's `bash.exe` (Windows) |

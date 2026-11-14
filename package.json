@@ -1,6 +1,6 @@
 {
   "name": "mcp-agent-bridges",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zero-dependency MCP servers that let Claude Code (or any MCP client) delegate coding tasks to OpenCode, Cursor CLI and Antigravity CLI through one consistent interface.",
   "type": "module",
   "bin": {

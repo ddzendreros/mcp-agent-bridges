@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white" alt="Node 18+">
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="Zero dependencies">
   <img src="https://img.shields.io/badge/MCP-stdio-8A2BE2" alt="MCP stdio">
-  <img src="https://img.shields.io/badge/tested%20on-Linux%20%7C%20macOS%20%7C%20Windows-informational" alt="Linux, macOS, Windows">
+  <img src="https://img.shields.io/badge/CI-Linux%20%7C%20macOS%20%7C%20Windows-informational" alt="CI on Linux, macOS, Windows">
 </p>
 
 <p align="center">
@@ -47,8 +47,8 @@ Files edited, every command with ✓ / ✗ and its exit code, tokens and cost wh
 </td>
 <td width="33%" valign="top">
 
-### 🛡️ Safe defaults
-Antigravity runs in `accept-edits` and only executes commands you allow-list **exactly**, for that task only. Nothing is written to the tools' own settings.
+### 🛡️ Clear permissions
+Antigravity only runs commands you allow-list **exactly**, for that task only. OpenCode and Cursor auto-approve by default (headless they cannot edit otherwise), so point them at a repo under version control. A timeout or cancellation stops the agent **and everything it started**.
 
 </td>
 </tr>
@@ -157,16 +157,18 @@ xychart-beta
 
 <sub>¹ Official `codex mcp-server`, which does not report timing. ² With the test command passed in `allow_commands`. One run per configuration on a Windows laptop, 2026-11-14, so times are indicative. Details and a release check of this exact code: [benchmark/RESULTS.md](benchmark/RESULTS.md). Run it yourself with [benchmark/](benchmark/).</sub>
 
-### Which one to use
+### What the test does and does not show
 
-| | Best for | Why |
+Every configuration solved the task, so this benchmark **does not rank the tools on quality**: the task is too easy to separate them, and one run per configuration is not enough for statistics. What it does show is speed, cost and how much each report helps the orchestrator verify the work. From that, and from day-to-day use:
+
+| | Fits | Seen here |
 |:--|:--|:--|
-| 🥇 **Codex** | important or tricky changes | strongest models, short honest reports, keeps the thread for follow-ups |
 | 💸 **OpenCode** | volume and mechanical work | $0 with free models, the most detailed report, automatic model fallback |
-| ⚡ **Cursor** | quick tasks | fastest in the test with `auto` |
+| ⚡ **Cursor** | quick tasks | fastest with `auto`; the Free plan runs out of usage quickly |
 | 🧯 **Antigravity** | backup | correct but slow, and bound by usage quotas |
+| **Codex** (not part of this repo) | follow-ups in the same thread | short reports, but no timing, files or commands in its MCP output |
 
-Every configuration solved the task. What differs is speed, cost and how easy the result is to verify.
+A harder task with several runs per configuration would be needed to compare quality; contributions welcome.
 
 ## 🔌 One interface
 
@@ -207,6 +209,7 @@ Honest notes from daily use:
 | 🐢 **Antigravity is slow and quota-bound** | It was the slowest in every run (up to ~8.5 min on a small task), and its models have per-account usage limits. When a limit is hit, or the server answers that it has no capacity, the bridge reports it. It only switches to other models of the same account if you set `fallback_models`. |
 | 🔒 **Antigravity runs no commands by default** | In `accept-edits` mode every command is denied. Only exact strings in `allow_commands` run (no wildcards). Pass the exact test command if you want it to check its own work. |
 | 🎟️ **Cursor Free plan** | It lists many models, but only `auto` and the Grok models actually run. Requests for other models fall back to `auto`, and the report says so. |
+| 🪟 **Cursor through `cmd.exe`** | On Windows the bridge starts Cursor's own `node.exe` directly so prompts arrive intact. If it cannot find that install (for example `CURSOR_AGENT_BIN` points to a launcher outside the install folder), the prompt goes through `cmd.exe`: line breaks are replaced by spaces (the report says so) and `%NAME%` is expanded. |
 | 🧾 **The report is a summary** | It is parsed from each CLI's event stream, whose format can change between versions. Always check the diff and run the tests. |
 | ⏱️ **No real parallelism** | Claude Code tends to run calls to different MCP servers one after another. |
 | 🪟 **Windows-first testing** | CI runs on Linux, macOS and Windows, but the end-to-end runs with the real CLIs were done on Windows 11. |
@@ -234,14 +237,18 @@ bin/cli.mjs                         npx entry point: <opencode|cursor|antigravit
 benchmark/                          task, hidden judge, prompt and results
 docs/                               configuration and interface reference
 examples/claude.json.example        ready-made MCP config
-test/                               smoke tests (no real CLI needed)
+test/                               tests and event-stream fixtures (no real CLI needed)
 ```
 
 ## 🛠️ Development
 
 ```bash
-npm test   # starts each bridge over stdio and checks the handshake, the schemas and the error handling
+npm test
 ```
+
+No real agent CLI is needed. The tests cover the MCP handshake, schemas and error handling of each bridge; the event-stream parsers, against fixtures with each CLI's structure; timeouts and cancellation stopping the whole process tree; multi-line prompts reaching Cursor; and that the plumbing shared by the three files stays identical.
+
+Each bridge is one self-contained file on purpose. The process and MCP code they share sits between `// <shared>` markers and must be the same in all three; `test/shared.test.mjs` checks it.
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
 

@@ -12,6 +12,7 @@
   <img src="https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white" alt="Node 18+">
   <img src="https://img.shields.io/badge/dependencias-0-brightgreen" alt="Sin dependencias">
   <img src="https://img.shields.io/badge/MCP-stdio-8A2BE2" alt="MCP stdio">
+  <img src="https://img.shields.io/badge/CI-Linux%20%7C%20macOS%20%7C%20Windows-informational" alt="CI en Linux, macOS y Windows">
 </p>
 
 <p align="center">
@@ -46,8 +47,8 @@ Archivos editados, cada comando con ✓ / ✗ y su código de salida, tokens y c
 </td>
 <td width="33%" valign="top">
 
-### 🛡️ Seguro por defecto
-Antigravity trabaja en `accept-edits` y solo ejecuta los comandos que autorizas **de forma exacta**, solo para esa tarea.
+### 🛡️ Permisos claros
+Antigravity solo ejecuta los comandos que autorizas **de forma exacta**, solo para esa tarea. OpenCode y Cursor aprueban solos por defecto (sin eso no pueden editar en modo no interactivo), así que úsalos sobre un repo con control de versiones. Un timeout o una cancelación detienen al agente **y todo lo que haya lanzado**.
 
 </td>
 </tr>
@@ -156,14 +157,18 @@ xychart-beta
 
 <sub>¹ `codex mcp-server` oficial, que no informa tiempos. ² Con el comando de tests en `allow_commands`. Una ejecución por configuración en una laptop con Windows, 2026-11-14: los tiempos son orientativos. Detalles y la prueba de esta versión del código: [benchmark/RESULTS.md](benchmark/RESULTS.md).</sub>
 
-### Cuál usar
+### Qué muestra la prueba y qué no
 
-| | Para | Por qué |
+Todas las configuraciones resolvieron la tarea, así que este benchmark **no ordena las herramientas por calidad**: la tarea es demasiado fácil para separarlas y una ejecución por configuración no da para estadística. Lo que sí muestra es velocidad, costo y cuánto ayuda cada informe a verificar el trabajo. Con eso y el uso diario:
+
+| | Encaja en | Lo que se vio |
 |:--|:--|:--|
-| 🥇 **Codex** | cambios importantes o delicados | los mejores modelos, informe corto y honesto, conserva la conversación |
 | 💸 **OpenCode** | volumen y trabajo mecánico | $0 con modelos gratuitos, el informe más completo, cambio automático de modelo |
-| ⚡ **Cursor** | tareas rápidas | el más rápido de la prueba con `auto` |
+| ⚡ **Cursor** | tareas rápidas | el más rápido con `auto`; el plan Free agota su uso pronto |
 | 🧯 **Antigravity** | respaldo | correcto pero lento y con límites de uso |
+| **Codex** (no es parte de este repo) | seguimientos en la misma conversación | informes cortos, pero su salida MCP no trae tiempos, archivos ni comandos |
+
+Para comparar calidad haría falta una tarea más difícil y varias ejecuciones por configuración; se aceptan contribuciones.
 
 ## 🔌 Una interfaz
 
@@ -185,6 +190,7 @@ Referencia completa (en inglés): [docs/interface.md](docs/interface.md).
 | 🐢 **Antigravity es lento y depende de la cuota** | Fue el más lento en todas las pruebas (hasta ~8,5 min en una tarea pequeña) y sus modelos tienen límites de uso por cuenta. Si se alcanza el límite, o el servidor responde que no tiene capacidad, el puente lo informa. Solo cambia a otros modelos de la misma cuenta si configuras `fallback_models`. |
 | 🔒 **Antigravity no ejecuta comandos por defecto** | Solo los que pases exactos en `allow_commands` (sin comodines). |
 | 🎟️ **Cursor en el plan Free** | Muestra muchos modelos, pero solo funcionan `auto` y los Grok. Si pides otro, usa `auto` y lo indica en el informe. |
+| 🪟 **Cursor a través de `cmd.exe`** | En Windows el puente lanza directamente el `node.exe` de Cursor para que el prompt llegue intacto. Si no encuentra esa instalación (por ejemplo, `CURSOR_AGENT_BIN` apunta a un lanzador fuera de la carpeta de instalación), el prompt pasa por `cmd.exe`: los saltos de línea se cambian por espacios (el informe lo avisa) y se expanden los `%NOMBRE%`. |
 | 🧾 **El informe es un resumen** | Se construye a partir de la salida de cada CLI, que puede cambiar entre versiones. Revisa siempre el diff y corre los tests. |
 | ⏱️ **Sin paralelismo real** | Claude Code suele ejecutar una tras otra las llamadas a distintos servidores MCP. |
 | 🪟 **Probado sobre todo en Windows** | La CI corre en Linux, macOS y Windows, pero las pruebas con las CLI reales se hicieron en Windows 11. |

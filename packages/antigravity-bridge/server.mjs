@@ -5,12 +5,160 @@
 // event stream goes to a log file.
 // Never uses --dangerously-skip-permissions: the default mode is accept-edits (file edits only),
 // and commands run only when the caller allow-lists them exactly, for that one task.
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const VERSION = "1.3.0";
+// <shared> ---------------------------------------------------------------------------------------
+// Process handling and MCP over stdio. This block is identical in the three bridges so each one
+// stays a single file; test/shared.test.mjs fails if the copies drift apart.
+const IS_WIN = process.platform === "win32";
+const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"]; // newest first
+const MIN_RETRY_MS = 20000; // do not start a fallback attempt with less time than this left
+const MARK = { ok: "✓", failed: "✗", blocked: "⛔" };
+const lastLine = (s) => String(s || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).pop()?.slice(0, 100) || "";
+
+// Stop a process and everything it started. child.kill() alone leaves grandchildren running
+// (and holding our pipes open, so "close" never fires) on every OS.
+function killTree(child) {
+  if (!child.pid) return;
+  if (IS_WIN) {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    return;
+  }
+  const signal = (sig) => { try { process.kill(-child.pid, sig); } catch { try { child.kill(sig); } catch { /* gone */ } } };
+  signal("SIGTERM");
+  setTimeout(() => signal("SIGKILL"), 3000).unref();
+}
+
+// Run one CLI call. Always resolves: on exit, on timeout and on cancellation (ctx), killing the
+// whole process tree in the last two cases.
+function runProcess(cmd, args, { cwd, env = process.env, shell = false, timeoutMs = 900000, ctx } = {}) {
+  return new Promise((res) => {
+    let out = "", err = "", timedOut = false, settled = false, grace;
+    const child = spawn(cmd, args, { cwd, env, shell, windowsHide: true, detached: !IS_WIN, stdio: ["ignore", "pipe", "pipe"] });
+    const finish = (code, extra = "") => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(grace);
+      ctx?.stops.delete(stop);
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      res({ code, out, err: err + extra, timedOut, cancelled: !!ctx?.cancelled });
+    };
+    const stop = () => { killTree(child); grace ??= setTimeout(() => finish(child.exitCode), 5000); };
+    ctx?.stops.add(stop);
+    child.stdout.on("data", (d) => (out += d));
+    child.stderr.on("data", (d) => (err += d));
+    const timer = setTimeout(() => { timedOut = true; stop(); }, Math.max(1, timeoutMs));
+    // If the CLI exits but something it started keeps our pipes open, do not wait for it.
+    child.on("exit", (code) => { grace ??= setTimeout(() => finish(code), 2000); });
+    child.on("error", (e) => finish(-1, String(e)));
+    child.on("close", (code) => finish(code));
+  });
+}
+
+function writeLog(dir, name, r) {
+  if (!dir || dir === "off") return null;
+  try {
+    mkdirSync(dir, { recursive: true });
+    const log = join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}_${name}.jsonl`);
+    writeFileSync(log, r.out + (r.err ? `\n#STDERR\n${r.err}` : ""));
+    return log;
+  } catch {
+    return null; // a log that cannot be written must not fail the task
+  }
+}
+
+// commands: [{ cmd, state: "ok" | "failed" | "blocked", detail? }] → report lines (the last 10).
+function fmtCommands(commands, max = 10) {
+  if (!commands.length) return null;
+  const shown = commands.slice(-max).map((c) => `${MARK[c.state] || MARK.failed} ${String(c.cmd).replace(/\s+/g, " ").slice(0, 120)}${c.detail ? ` (${c.detail})` : ""}`);
+  const skipped = commands.length - shown.length;
+  return `commands:${skipped ? `\n  … ${skipped} earlier command(s) not shown` : ""}\n  ${shown.join("\n  ")}`;
+}
+
+// Minimal MCP server over stdio (newline-delimited JSON-RPC): tools, ping, progress, cancellation.
+function serve({ name, version, instructions, tools, call }) {
+  const running = new Map(); // request id → ctx
+  const send = (msg) => process.stdout.write(JSON.stringify(msg) + "\n");
+  const reply = (id, result) => send({ jsonrpc: "2.0", id, result });
+  const cancel = (ctx) => {
+    if (!ctx || ctx.cancelled) return;
+    ctx.cancelled = true;
+    for (const stop of [...ctx.stops]) stop();
+  };
+  async function handle(msg) {
+    const { id, method, params } = msg;
+    if (id === undefined || id === null) {
+      if (method === "notifications/cancelled") cancel(running.get(params?.requestId));
+      return;
+    }
+    try {
+      if (method === "initialize") {
+        const protocolVersion = PROTOCOLS.includes(params?.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
+        return reply(id, { protocolVersion, capabilities: { tools: {} }, serverInfo: { name, version }, instructions });
+      }
+      if (method === "ping") return reply(id, {});
+      if (method === "tools/list") return reply(id, { tools });
+      if (method === "tools/call") {
+        const ctx = { cancelled: false, stops: new Set() };
+        running.set(id, ctx);
+        const token = params?._meta?.progressToken, started = Date.now();
+        const beat = token === undefined ? null : setInterval(() => {
+          const s = Math.round((Date.now() - started) / 1000);
+          send({ jsonrpc: "2.0", method: "notifications/progress", params: { progressToken: token, progress: s, message: `running for ${s}s` } });
+        }, 15000);
+        try {
+          const r = await call(params?.name, params?.arguments || {}, ctx);
+          if (!ctx.cancelled) reply(id, { content: [{ type: "text", text: r.text }], isError: r.isError });
+        } catch (e) {
+          if (!ctx.cancelled) reply(id, { content: [{ type: "text", text: String(e?.message || e) }], isError: true });
+        } finally {
+          clearInterval(beat);
+          running.delete(id);
+        }
+        return;
+      }
+      send({ jsonrpc: "2.0", id, error: { code: -32601, message: `method not supported: ${method}` } });
+    } catch (e) {
+      send({ jsonrpc: "2.0", id, error: { code: -32603, message: String(e?.message || e) } });
+    }
+  }
+  // When the client goes away, stop every agent still running instead of leaving it orphaned.
+  const shutdown = () => {
+    for (const ctx of running.values()) cancel(ctx);
+    process.exit(0);
+  };
+  let buf = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk) => {
+    buf += chunk;
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (!line) continue;
+      let msg;
+      try { msg = JSON.parse(line); } catch { continue; /* ignore invalid line */ }
+      handle(msg);
+    }
+  });
+  process.stdin.on("end", shutdown);
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
+}
+
+// True when this file is the script node was started with (not when imported by bin/cli.mjs or tests).
+function isMain(url) {
+  try { return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(url)); } catch { return false; }
+}
+// </shared> --------------------------------------------------------------------------------------
+
+const VERSION = "1.1.0";
 const LOCAL = process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
 const findExe = () =>
   process.env.AGY_BIN ||
@@ -22,8 +170,9 @@ const LOG_DIR = process.env.AGY_BRIDGE_LOGS || join(homedir(), ".mcp-agent-bridg
 const MAX_TEXT = Number(process.env.AGY_BRIDGE_MAX_CHARS || 4000);
 // Optional: other models of the same account to use if the requested one hits its usage limit.
 const DEFAULT_FALLBACKS = (process.env.AGY_BRIDGE_FALLBACKS || "").split(",").map((s) => s.trim()).filter(Boolean);
-// Usage limits (quota, rate limit) and temporary lack of server capacity (503).
-const LIMIT = /RESOURCE_EXHAUSTED|quota reached|quota exceeded|rate limit|\b429\b|UNAVAILABLE \(code 503\)|no capacity available/i;
+// Usage limits (quota, rate limit) and temporary lack of server capacity (503). Matched against
+// errors and stderr only. A bare "429" is not enough (it could be a line number or an id).
+const LIMIT = /RESOURCE_EXHAUSTED|quota reached|quota exceeded|rate limit|too many requests|\b(?:code|status|http)\W{0,3}429\b|UNAVAILABLE \(code 503\)|no capacity available/i;
 
 const INSTRUCTIONS = `antigravity-bridge: delegate execution work to the Antigravity CLI (agy).
 Use it for mechanical, well-specified tasks: implementing an already-decided plan, refactors, tests, boilerplate, docs.
@@ -51,7 +200,7 @@ const TOOLS = [
         },
         session_id: { type: "string", description: "Continue a previous conversation (--conversation). Alias: conversation_id." },
         conversation_id: { type: "string", description: "Alias of session_id." },
-        timeout_s: { type: "number", description: "Time limit in seconds (default 900)." },
+        timeout_s: { type: "number", description: "Time limit in seconds for the whole call (default 900). The agent and everything it started is stopped when it runs out." },
         mode: { type: "string", enum: ["accept-edits", "plan"], description: "accept-edits (default: edits files, no commands) or plan (read-only)." },
         effort: { type: "string", enum: ["low", "medium", "high", "xhigh", "max"], description: "Reasoning effort. Optional." },
         allow_commands: {
@@ -71,30 +220,9 @@ const TOOLS = [
   },
 ];
 
-function run(args, cwd, timeoutMs) {
-  return new Promise((res) => {
-    // agy is a real executable: no shell, so newlines in the prompt arrive intact.
-    const child = spawn(findExe(), args, { cwd, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
-    let out = "", err = "", timedOut = false;
-    child.stdout.on("data", (d) => (out += d));
-    child.stderr.on("data", (d) => (err += d));
-    const t = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);
-    child.on("error", (e) => { clearTimeout(t); res({ code: -1, out, err: err + String(e), timedOut }); });
-    child.on("close", (code) => { clearTimeout(t); res({ code, out, err, timedOut }); });
-  });
-}
-
-function writeLog(name, r) {
-  if (LOG_DIR === "off") return null;
-  mkdirSync(LOG_DIR, { recursive: true });
-  const log = join(LOG_DIR, `${new Date().toISOString().replace(/[:.]/g, "-")}_${name}.jsonl`);
-  writeFileSync(log, r.out + (r.err ? `\n#STDERR\n${r.err}` : ""));
-  return log;
-}
-
 function summarize(raw) {
   const deltas = [], errors = [], files = new Set(), tools = {}, seenTool = new Set();
-  const commands = []; // { cmd, state: ok | blocked | error }
+  const commands = []; // { cmd, state: ok | failed | blocked, detail }
   const usage = { input: 0, output: 0, thinking: 0, cache_read: 0 };
   let conversationID, model, result;
   for (const line of raw.split(/\r?\n/)) {
@@ -116,8 +244,14 @@ function summarize(raw) {
       }
       if (su.tool_name === "run_command" && (su.state === "DONE" || su.state === "ERROR")) {
         const cmd = su.tool_info?.parameters?.CommandLine || "?";
+        const output = String(su.tool_info?.output || "");
         const denied = su.state === "ERROR" && /permission check failed|denied/i.test(su.tool_info?.error?.message || "");
-        commands.push({ cmd, state: denied ? "blocked" : su.state === "DONE" ? "ok" : "error" });
+        // A DONE step only means the command ran; its exit code is in the output text.
+        const exit = output.match(/Command exited with code (-?\d+)/i)?.[1];
+        const tail = lastLine(output.split(/Command output:/i)[1] || "");
+        if (denied) commands.push({ cmd, state: "blocked", detail: "not allowed" });
+        else if (su.state === "DONE") commands.push({ cmd, state: exit === undefined || exit === "0" ? "ok" : "failed", detail: `exit ${exit ?? "?"}${tail ? ` → ${tail}` : ""}` });
+        else commands.push({ cmd, state: "failed", detail: lastLine(su.tool_info?.error?.message) || "error" });
       }
       if (su.step_type === "agent_response" && su.text_delta) deltas.push(su.text_delta);
       if (su.state === "DONE" && su.usage) {
@@ -188,7 +322,7 @@ function recoveryPrompt(blocked, allow) {
   ].join(" ");
 }
 
-async function antigravityTask(a) {
+async function antigravityTask(a, ctx) {
   if (!a.prompt) throw new Error("prompt is required");
   const cwd = resolve(a.cwd || process.cwd());
   if (!existsSync(cwd)) throw new Error(`cwd does not exist: ${cwd}`);
@@ -218,15 +352,16 @@ async function antigravityTask(a) {
   let last, lastR;
 
   for (let attempt = 0; attempt < 8; attempt++) {
-    const left = Math.floor((deadline - Date.now()) / 1000);
-    if (left < 20) break;
+    const leftMs = deadline - Date.now();
+    if (ctx?.cancelled || (attempt > 0 && leftMs < MIN_RETRY_MS)) break;
+    const left = Math.max(1, Math.floor(leftMs / 1000));
     const args = [...argsFor(curModel), "--print-timeout", `${left}s`];
     if (conv) args.push("--conversation", conv);
     args.push("-p", prompt);
     // Extra margin over --print-timeout so agy can exit on its own before being killed.
-    const r = await run(args, cwd, (left + 30) * 1000);
+    const r = await runProcess(findExe(), args, { cwd, timeoutMs: (left + 30) * 1000, ctx });
     const s = summarize(r.out);
-    const log = writeLog(`${s.conversationID || "noconv"}${attempt ? `_try${attempt}` : ""}`, r);
+    const log = writeLog(LOG_DIR, `${s.conversationID || "noconv"}${attempt ? `_try${attempt}` : ""}`, r);
     if (log) logs.push(log);
     s.files.forEach((f) => files.add(f));
     for (const [k, v] of Object.entries(s.tools)) tools[k] = (tools[k] || 0) + v;
@@ -234,7 +369,7 @@ async function antigravityTask(a) {
     commands.push(...s.commands);
     last = s; lastR = r;
     conv = s.conversationID || conv;
-    if (r.timedOut) { errors.push(...s.errors); break; }
+    if (r.timedOut || r.cancelled) { errors.push(...s.errors); break; }
     // Usage/capacity limit on this model → next configured fallback model, resuming the conversation if any.
     if (LIMIT.test(`${s.errors.join(" ")} ${r.err}`) && fbIdx < fallbacks.length) {
       const next = fallbacks[fbIdx++];
@@ -251,10 +386,9 @@ async function antigravityTask(a) {
 
   const s = last, r = lastR;
   const ok = !!r && r.code === 0 && !r.timedOut && errors.length === 0 && s.result?.status === "SUCCESS" && !s.denied;
-  const limitHit = !ok && LIMIT.test(errors.join(" "));
-  const status = ok ? "ok" : r?.timedOut ? "timeout" : s?.denied ? "incomplete (command blocked)"
+  const limitHit = !ok && LIMIT.test(`${errors.join(" ")} ${r?.err || ""}`);
+  const status = ok ? "ok" : r?.timedOut ? "timeout (the agent and its processes were stopped)" : s?.denied ? "incomplete (command blocked)"
     : limitHit ? "usage or capacity limit reached (part of the work may be done: check files and commands)" : "error";
-  const fmtCmds = commands.map((c) => `${c.state === "ok" ? "✓" : c.state === "blocked" ? "⛔" : "✗"} ${c.cmd}`);
   const lines = [
     `status: ${status} (exit ${r?.code ?? "-"}, ${Math.round((Date.now() - started) / 1000)}s${recoveries ? `, ${recoveries} recovery(ies) after blocked command` : ""})`,
     `session_id: ${conv || "-"}`,
@@ -262,7 +396,7 @@ async function antigravityTask(a) {
     ...notes,
     files.size ? `files_edited: ${[...files].join(", ")}` : null,
     Object.keys(tools).length ? `tools: ${Object.entries(tools).map(([k, v]) => `${k}×${v}`).join(", ")}` : null,
-    fmtCmds.length ? `commands:\n  ${fmtCmds.slice(0, 10).join("\n  ")}` : null,
+    fmtCommands(commands),
     usage.input || usage.output ? `tokens: in ${usage.input}, out ${usage.output}, thinking ${usage.thinking}, cache_read ${usage.cache_read}` : null,
     errors.length ? `errors: ${errors.slice(0, 5).join(" | ")}` : null,
     !ok && r?.err?.trim() ? `stderr: ${r.err.trim().slice(-600)}` : null,
@@ -273,51 +407,21 @@ async function antigravityTask(a) {
   return { text: lines.join("\n"), isError: !ok };
 }
 
-async function antigravityModels() {
-  const r = await run(["models"], process.cwd(), 90000);
+async function antigravityModels(ctx) {
+  const r = await runProcess(findExe(), ["models"], { cwd: process.cwd(), timeoutMs: 90000, ctx });
   const text = (r.out + (r.err ? `\n${r.err}` : "")).trim();
   return { text: text || `(no output, exit ${r.code})`, isError: r.code !== 0 };
 }
 
-// ---- JSON-RPC over stdio (newline-delimited messages) ----
-const send = (msg) => process.stdout.write(JSON.stringify(msg) + "\n");
-async function handle(msg) {
-  const { id, method, params } = msg;
-  if (id === undefined) return; // notifications
-  try {
-    if (method === "initialize") {
-      return send({ jsonrpc: "2.0", id, result: {
-        protocolVersion: params?.protocolVersion || "2025-06-18",
-        capabilities: { tools: {} },
-        serverInfo: { name: "antigravity-bridge", version: VERSION },
-        instructions: INSTRUCTIONS,
-      } });
-    }
-    if (method === "ping") return send({ jsonrpc: "2.0", id, result: {} });
-    if (method === "tools/list") return send({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
-    if (method === "tools/call") {
-      const name = params?.name;
-      const r = name === "antigravity_task" ? await antigravityTask(params.arguments || {})
-        : name === "antigravity_models" ? await antigravityModels()
-        : (() => { throw new Error(`unknown tool: ${name}`); })();
-      return send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: r.text }], isError: r.isError } });
-    }
-    send({ jsonrpc: "2.0", id, error: { code: -32601, message: `method not supported: ${method}` } });
-  } catch (e) {
-    if (method === "tools/call") send({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: String(e?.message || e) }], isError: true } });
-    else send({ jsonrpc: "2.0", id, error: { code: -32603, message: String(e?.message || e) } });
-  }
+export { VERSION, summarize, runProcess };
+export function main() {
+  serve({
+    name: "antigravity-bridge", version: VERSION, instructions: INSTRUCTIONS, tools: TOOLS,
+    call: (name, args, ctx) => {
+      if (name === "antigravity_task") return antigravityTask(args, ctx);
+      if (name === "antigravity_models") return antigravityModels(ctx);
+      throw new Error(`unknown tool: ${name}`);
+    },
+  });
 }
-
-let buf = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-  buf += chunk;
-  let i;
-  while ((i = buf.indexOf("\n")) >= 0) {
-    const line = buf.slice(0, i).trim();
-    buf = buf.slice(i + 1);
-    if (!line) continue;
-    try { handle(JSON.parse(line)); } catch { /* ignore invalid line */ }
-  }
-});
+if (isMain(import.meta.url)) main();

@@ -6,4 +6,5 @@ if (!BRIDGES[name]) {
   process.stderr.write(`usage: mcp-agent-bridges <${Object.keys(BRIDGES).join("|")}>\n`);
   process.exit(2);
 }
-await import(new URL(`../packages/${BRIDGES[name]}/server.mjs`, import.meta.url));
+const bridge = await import(new URL(`../packages/${BRIDGES[name]}/server.mjs`, import.meta.url));
+bridge.main();
