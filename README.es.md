@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="mcp-agent-bridges — un orquestador planea y revisa, otros agentes escriben el código" width="100%">
+  <img src="assets/banner.es.svg" alt="mcp-agent-bridges — un orquestador planea y revisa, otros agentes escriben el código" width="100%">
+</p>
+
+<p align="center">
+  <a href="README.md">🇬🇧 English</a> &nbsp;|&nbsp; <b>🇪🇸 Español</b>
 </p>
 
 <p align="center">
@@ -15,8 +19,7 @@
   <b><a href="#-benchmark">Benchmark</a></b> ·
   <b><a href="#-una-interfaz">Interfaz</a></b> ·
   <b><a href="docs/configuration.md">Configuración</a></b> ·
-  <b><a href="#%EF%B8%8F-limitaciones">Limitaciones</a></b> ·
-  <b><a href="README.md">English</a></b>
+  <b><a href="#%EF%B8%8F-limitaciones">Limitaciones</a></b>
 </p>
 
 ---

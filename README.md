@@ -3,6 +3,10 @@
 </p>
 
 <p align="center">
+  <b>🇬🇧 English</b> &nbsp;|&nbsp; <a href="README.es.md">🇪🇸 Español</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/ddzendreros/mcp-agent-bridges/actions/workflows/ci.yml"><img src="https://github.com/ddzendreros/mcp-agent-bridges/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A518-339933?logo=node.js&logoColor=white" alt="Node 18+">
@@ -16,8 +20,7 @@
   <b><a href="#-benchmark">Benchmark</a></b> ·
   <b><a href="#-one-interface">Interface</a></b> ·
   <b><a href="docs/configuration.md">Configuration</a></b> ·
-  <b><a href="#%EF%B8%8F-limitations">Limitations</a></b> ·
-  <b><a href="README.es.md">Español</a></b>
+  <b><a href="#%EF%B8%8F-limitations">Limitations</a></b>
 </p>
 
 ---

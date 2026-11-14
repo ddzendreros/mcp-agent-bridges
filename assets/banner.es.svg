@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="mcp-agent-bridges: Claude Code planea y revisa; OpenCode, Cursor y Antigravity ejecutan">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="1" stop-color="#1a1440"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#ffffff" stroke-opacity="0.04"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10z" fill="#8b9cc8"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="420" rx="24" fill="url(#bg)"/>
+  <rect width="1280" height="420" rx="24" fill="url(#grid)"/>
+
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+    <text x="72" y="118" font-size="54" font-weight="800" fill="#ffffff">mcp-agent-bridges</text>
+    <rect x="72" y="138" width="120" height="5" rx="2.5" fill="url(#accent)"/>
+    <text x="72" y="192" font-size="24" fill="#c9d3f0">Un orquestador planea y revisa.</text>
+    <text x="72" y="226" font-size="24" fill="#c9d3f0">Otros agentes escriben el código.</text>
+    <text x="72" y="300" font-size="17" fill="#8b9cc8">MCP · stdio · sin dependencias · Node 18+</text>
+    <text x="72" y="330" font-size="17" fill="#8b9cc8">mismos parámetros · mismo informe · modelo por llamada</text>
+
+    <!-- orchestrator -->
+    <rect x="640" y="168" width="200" height="84" rx="16" fill="#151b33" stroke="url(#accent)" stroke-width="2"/>
+    <text x="740" y="204" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">Claude Code</text>
+    <text x="740" y="230" font-size="14" fill="#8b9cc8" text-anchor="middle">planea · decide · verifica</text>
+
+    <!-- arrows -->
+    <path d="M840 196 C 900 196, 900 108, 960 108" fill="none" stroke="#8b9cc8" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M840 210 L 960 210" fill="none" stroke="#8b9cc8" stroke-width="2" marker-end="url(#arrow)"/>
+    <path d="M840 224 C 900 224, 900 312, 960 312" fill="none" stroke="#8b9cc8" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- delegates -->
+    <rect x="962" y="72" width="246" height="72" rx="14" fill="#11172c" stroke="#2b3561"/>
+    <circle cx="992" cy="108" r="7" fill="#22d3ee"/>
+    <text x="1010" y="104" font-size="18" font-weight="700" fill="#ffffff">OpenCode</text>
+    <text x="1010" y="126" font-size="13" fill="#8b9cc8">opencode_task</text>
+
+    <rect x="962" y="174" width="246" height="72" rx="14" fill="#11172c" stroke="#2b3561"/>
+    <circle cx="992" cy="210" r="7" fill="#a78bfa"/>
+    <text x="1010" y="206" font-size="18" font-weight="700" fill="#ffffff">Cursor CLI</text>
+    <text x="1010" y="228" font-size="13" fill="#8b9cc8">cursor_task</text>
+
+    <rect x="962" y="276" width="246" height="72" rx="14" fill="#11172c" stroke="#2b3561"/>
+    <circle cx="992" cy="312" r="7" fill="#34d399"/>
+    <text x="1010" y="308" font-size="18" font-weight="700" fill="#ffffff">Antigravity CLI</text>
+    <text x="1010" y="330" font-size="13" fill="#8b9cc8">antigravity_task</text>
+  </g>
+</svg>
