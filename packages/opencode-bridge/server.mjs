@@ -10,10 +10,12 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // <shared> ---------------------------------------------------------------------------------------
-// Process handling and MCP over stdio. This block is identical in the three bridges so each one
+// Process handling and MCP over stdio. This block is identical in every bridge so each one
 // stays a single file; test/shared.test.mjs fails if the copies drift apart.
 const IS_WIN = process.platform === "win32";
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"]; // newest first
+const DEPTH = Number(process.env.MCP_AGENT_BRIDGES_DEPTH) || 0;
+const MAX_DEPTH = Number(process.env.MCP_AGENT_BRIDGES_MAX_DEPTH) || 1;
 const MIN_RETRY_MS = 20000; // do not start a fallback attempt with less time than this left
 const MARK = { ok: "✓", failed: "✗", blocked: "⛔" };
 const lastLine = (s) => String(s || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).pop()?.slice(0, 100) || "";
@@ -33,10 +35,11 @@ function killTree(child) {
 
 // Run one CLI call. Always resolves: on exit, on timeout and on cancellation (ctx), killing the
 // whole process tree in the last two cases.
-function runProcess(cmd, args, { cwd, env = process.env, shell = false, timeoutMs = 900000, ctx } = {}) {
+function runProcess(cmd, args, { cwd, env = process.env, shell = false, input, timeoutMs = 900000, ctx } = {}) {
   return new Promise((res) => {
     let out = "", err = "", timedOut = false, settled = false, grace;
-    const child = spawn(cmd, args, { cwd, env, shell, windowsHide: true, detached: !IS_WIN, stdio: ["ignore", "pipe", "pipe"] });
+    const childEnv = { ...env, MCP_AGENT_BRIDGES_DEPTH: String(DEPTH + 1) };
+    const child = spawn(cmd, args, { cwd, env: childEnv, shell, windowsHide: true, detached: !IS_WIN, stdio: [typeof input === "string" ? "pipe" : "ignore", "pipe", "pipe"] });
     const finish = (code, extra = "") => {
       if (settled) return;
       settled = true;
@@ -51,6 +54,10 @@ function runProcess(cmd, args, { cwd, env = process.env, shell = false, timeoutM
     ctx?.stops.add(stop);
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
+    if (typeof input === "string") {
+      child.stdin.on("error", (e) => { if (e.code !== "EPIPE") err += String(e); });
+      child.stdin.end(input);
+    }
     const timer = setTimeout(() => { timedOut = true; stop(); }, Math.max(1, timeoutMs));
     // If the CLI exits but something it started keeps our pipes open, do not wait for it.
     child.on("exit", (code) => { grace ??= setTimeout(() => finish(code), 2000); });
@@ -103,6 +110,10 @@ function serve({ name, version, instructions, tools, call }) {
       if (method === "ping") return reply(id, {});
       if (method === "tools/list") return reply(id, { tools });
       if (method === "tools/call") {
+        if (DEPTH >= MAX_DEPTH) {
+          const text = `nested delegation blocked: this bridge was started by an agent that is itself a delegate (MCP_AGENT_BRIDGES_DEPTH=${DEPTH}, max ${MAX_DEPTH}). The orchestrator should do this itself or delegate it directly.`;
+          return reply(id, { content: [{ type: "text", text }], isError: true });
+        }
         const ctx = { cancelled: false, stops: new Set() };
         running.set(id, ctx);
         const token = params?._meta?.progressToken, started = Date.now();
@@ -156,7 +167,7 @@ function isMain(url) {
 }
 // </shared> --------------------------------------------------------------------------------------
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const EXE =
   process.env.OPENCODE_BIN ||
   [join(process.env.APPDATA || "", "npm", "node_modules", "@opencode", "cli", "bin", "opencode.exe")].find((p) => existsSync(p)) ||
@@ -199,6 +210,7 @@ const TOOLS = [
       },
       required: ["prompt"],
     },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   },
 ];
 

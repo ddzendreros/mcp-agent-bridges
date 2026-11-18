@@ -17,6 +17,7 @@
 
 <p align="center">
   <b><a href="#-quick-start">Quick start</a></b> ·
+  <b><a href="#%EF%B8%8F-pick-your-orchestrator">Orchestrators</a></b> ·
   <b><a href="#-benchmark">Benchmark</a></b> ·
   <b><a href="#-one-interface">Interface</a></b> ·
   <b><a href="docs/configuration.md">Configuration</a></b> ·
@@ -25,7 +26,7 @@
 
 ---
 
-**mcp-agent-bridges** is a set of three small MCP servers that let **Claude Code** (or any MCP client) hand coding work to **OpenCode**, **Cursor CLI** and **Antigravity CLI**, and get back a short, uniform report it can verify.
+**mcp-agent-bridges** is a set of five small MCP servers for handing coding work among **Claude Code**, **Codex**, **OpenCode**, **Cursor CLI** and **Antigravity CLI**. Any one can orchestrate; the others execute and return a short, uniform report for it to verify.
 
 The orchestrator keeps the expensive part: understanding the codebase, deciding and reviewing. The delegates do the mechanical part (the code, the tests, the boilerplate), often with cheaper or free models.
 
@@ -36,7 +37,7 @@ The orchestrator keeps the expensive part: understanding the codebase, deciding 
 <td width="33%" valign="top">
 
 ### 🔌 One interface
-`prompt`, `cwd`, `model`, `fallback_models`, `session_id` and `timeout_s` on every bridge, and the same report back. Switch delegates without relearning flags.
+`prompt`, `cwd`, `model`, `fallback_models`, `session_id` and `timeout_s` on every bridge, and the same report back. Switch executors without relearning flags.
 
 </td>
 <td width="33%" valign="top">
@@ -48,7 +49,7 @@ Files edited, every command with ✓ / ✗ and its exit code, tokens and cost wh
 <td width="33%" valign="top">
 
 ### 🛡️ Clear permissions
-Antigravity only runs commands you allow-list **exactly**, for that task only. OpenCode and Cursor auto-approve by default (headless they cannot edit otherwise), so point them at a repo under version control. A timeout or cancellation stops the agent **and everything it started**.
+Claude and Antigravity use exact command allow-lists; Codex offers only workspace-write or read-only. OpenCode and Cursor auto-approve by default (headless they cannot edit otherwise), so use version control. A timeout or cancellation stops the agent **and everything it started**.
 
 </td>
 </tr>
@@ -56,13 +57,13 @@ Antigravity only runs commands you allow-list **exactly**, for that task only. O
 <td valign="top">
 
 ### 🔁 Model per call
-Choose the model on every call and give an ordered list of fallbacks: on error (OpenCode), when a model is not on your plan (Cursor), or on usage/capacity limits (Antigravity).
+Choose the model on every call and give an ordered fallback list. Each bridge switches only on its documented error conditions, never after timeout or cancellation.
 
 </td>
 <td valign="top">
 
 ### 🪟 Works on Windows
-Fixes for issues found in daily use: multi-line prompts cut by `cmd.exe`, `cursor-agent` failing with *"Can't find Bash"*, OpenCode resolving paths in the wrong folder.
+Claude and Codex prompts go on stdin, avoiding the argv limit and `cmd.exe` line breaks. The existing Cursor Bash and OpenCode working-directory fixes remain.
 
 </td>
 <td valign="top">
@@ -80,7 +81,7 @@ Each bridge is a single readable `server.mjs`. Run it with `npx` straight from G
 sequenceDiagram
     autonumber
     actor You
-    participant C as Claude Code
+    participant C as Orchestrator (Claude Code, Codex, …)
     participant B as bridge (MCP)
     participant A as agent CLI
     You->>C: "Add tests for the parser"
@@ -95,19 +96,48 @@ sequenceDiagram
 
 ## 🚀 Quick start
 
-**1. Install the agents you want** and log in to each one: [OpenCode](https://opencode.ai), [Cursor CLI](https://cursor.com/cli), Antigravity CLI. You also need **Node.js 18+**.
-
-**2. Register the bridges** with Claude Code:
+Install and log in to the agent CLIs you want, plus **Node.js 18+**. Preview a Codex-orchestrated setup with Antigravity and OpenCode as executors:
 
 ```bash
-claude mcp add opencode    --scope user -- npx -y github:ddzendreros/mcp-agent-bridges opencode
-claude mcp add cursor      --scope user -- npx -y github:ddzendreros/mcp-agent-bridges cursor
-claude mcp add antigravity --scope user -- npx -y github:ddzendreros/mcp-agent-bridges antigravity
+npx -y github:ddzendreros/mcp-agent-bridges#v1.2.0 setup --orchestrator codex --executors antigravity,opencode
 ```
 
-**3. Restart Claude Code and delegate:**
+Nothing is written yet. Review the commands and files, then rerun the same line with `--write`. The `#v1.2.0` tag must exist; it is created when the release is published. Restart the orchestrator and delegate:
 
-> *Use opencode_task with model opencode/deepseek-v4.1-flash-free to add unit tests for `src/parser.ts` and run them. Then review the diff yourself.*
+> *Use antigravity_task with model gemini-3.8-flash-low to add tests for `src/parser.ts` and run them. Then review the diff yourself.*
+
+Run `npx -y github:ddzendreros/mcp-agent-bridges#v1.2.0 doctor` to see which agent CLIs are installed and their versions.
+
+## 🎛️ Pick your orchestrator
+
+The orchestrator and executors are independent choices. For example, Codex can plan and review while a paid Antigravity account does the implementation.
+
+| Orchestrator | What setup does | Guide goes to |
+|---|---|---|
+| Claude Code | `claude mcp add --scope user` | `~/.claude/skills/delegate-coding-tasks/SKILL.md` |
+| Codex | `codex mcp add`; sets `tool_timeout_sec = 1800` in each server's table in `$CODEX_HOME/config.toml` or `~/.codex/config.toml` | `$CODEX_HOME/AGENTS.md` or `~/.codex/AGENTS.md` |
+| OpenCode | `opencode mcp add --global` | `$XDG_CONFIG_HOME/opencode/AGENTS.md` or `~/.config/opencode/AGENTS.md` |
+| Cursor | merges servers into `~/.cursor/mcp.json` | no global file; use `--guide-file <project>/AGENTS.md` |
+| Antigravity | `agy mcp add` | `~/.gemini/GEMINI.md` |
+
+The guide comes from [`templates/orchestrator-guide.md`](templates/orchestrator-guide.md) and contains only the selected executors. In `AGENTS.md`, `GEMINI.md` or a custom guide file, setup manages only the block between `<!-- mcp-agent-bridges:start -->` and `<!-- mcp-agent-bridges:end -->`. It will not overwrite a Claude skill it did not generate. Existing files are backed up to `.bak-<timestamp>` before a change. Cursor's JSON is merged, so other servers stay in place.
+
+Server names are `claude`, `codex-bridge`, `opencode`, `cursor` and `antigravity`. `codex-bridge` avoids clashing with the official `codex mcp-server`, which is commonly registered as `codex`.
+
+Setup options:
+
+- `--executors all` selects every agent except the orchestrator. If an explicit list includes the orchestrator, it is skipped with a note.
+- `--source npx|local` selects the registered bridge command. The default is local in a clone and release-pinned `npx` otherwise; on Windows, setup uses `cmd /c npx`.
+- `--no-guide` skips the guide; `--guide-file <path>` writes its managed section to a file you choose.
+
+With Claude Code as the orchestrator, setup performs the equivalent of these per-executor commands:
+
+```bash
+claude mcp add opencode    --scope user -- npx -y github:ddzendreros/mcp-agent-bridges#v1.2.0 opencode
+claude mcp add cursor      --scope user -- npx -y github:ddzendreros/mcp-agent-bridges#v1.2.0 cursor
+claude mcp add antigravity --scope user -- npx -y github:ddzendreros/mcp-agent-bridges#v1.2.0 antigravity
+claude mcp add codex-bridge --scope user -- npx -y github:ddzendreros/mcp-agent-bridges#v1.2.0 codex
+```
 
 <details>
 <summary><b>Other ways to install</b> (clone, manual config, other MCP clients)</summary>
@@ -117,13 +147,19 @@ git clone https://github.com/ddzendreros/mcp-agent-bridges.git
 claude mcp add opencode --scope user -- node /path/to/mcp-agent-bridges/packages/opencode-bridge/server.mjs
 ```
 
-Or edit `~/.claude.json` by hand using [`examples/claude.json.example`](examples/claude.json.example). Any MCP client that speaks stdio can use the same entries. All environment variables are in [docs/configuration.md](docs/configuration.md).
+Or edit `~/.claude.json` by hand using [`examples/claude.json.example`](examples/claude.json.example). Any MCP client that speaks stdio can use the same bridge commands. All setup details and environment variables are in [docs/configuration.md](docs/configuration.md).
 </details>
 
 <details>
-<summary><b>Adding Codex</b> (official OpenAI server, not part of this repo)</summary>
+<summary><b>Adding Codex</b> (this repo's bridge or the official OpenAI server)</summary>
 
-Codex already ships its own MCP server. This repo does not wrap or modify it; it only appears in the benchmark as a reference point.
+Codex can execute through this repo's `codex-bridge`, which exposes `codex_task` and returns the same files, tools, commands, tokens and final-answer report as the other bridges:
+
+```bash
+claude mcp add codex-bridge --scope user -- npx -y github:ddzendreros/mcp-agent-bridges#v1.2.0 codex
+```
+
+The official `codex mcp-server` remains a separate option and is not modified by this repo:
 
 ```bash
 claude mcp add codex --scope user -- codex mcp-server
@@ -166,20 +202,22 @@ Every configuration solved the task, so this benchmark **does not rank the tools
 | 💸 **OpenCode** | volume and mechanical work | $0 with free models, the most detailed report, automatic model fallback |
 | ⚡ **Cursor** | quick tasks | fastest with `auto`; the Free plan runs out of usage quickly |
 | 🧯 **Antigravity** | backup | correct but slow, and bound by usage quotas |
-| **Codex** (not part of this repo) | follow-ups in the same thread | short reports, but no timing, files or commands in its MCP output |
+| **Codex** (official server in this benchmark) | follow-ups in the same thread | short reports, but no timing, files or commands in its MCP output |
 
 A harder task with several runs per configuration would be needed to compare quality; contributions welcome.
 
 ## 🔌 One interface
 
-| | `opencode_task` | `cursor_task` | `antigravity_task` |
-|:--|:--:|:--:|:--:|
-| `prompt` · `cwd` · `model` · `timeout_s` | ✅ | ✅ | ✅ |
-| `session_id` (follow-ups) | ✅ | ✅ | ✅ |
-| `fallback_models` triggers on | error | model not on plan | usage / capacity limit |
-| read-only mode | `agent: "plan"` | `mode: "plan"` / `"ask"` | `mode: "plan"` |
-| `allow_commands` · `max_recoveries` | — | — | ✅ |
-| list models | — | `cursor_models` | `antigravity_models` |
+| | `claude_task` | `codex_task` | `opencode_task` | `cursor_task` | `antigravity_task` |
+|:--|:--:|:--:|:--:|:--:|:--:|
+| `prompt` · `cwd` · `model` · `timeout_s` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `session_id` · `fallback_models` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fallback trigger | usage / overload / model unavailable | usage / capacity / model unavailable | error | model not on plan | usage / capacity |
+| read-only mode | `mode: "plan"` | `sandbox: "read-only"` | `agent: "plan"` | `mode: "plan"` / `"ask"` | `mode: "plan"` |
+| command control | exact `allow_commands` | sandbox | `auto_approve` | `force` | exact `allow_commands` |
+| list models | — | — | — | `cursor_models` | `antigravity_models` |
+
+Claude defaults to `acceptEdits`; allowed commands become exact `Bash(<cmd>)` entries, while other commands are denied and reported without stopping the task. `use_mcp` defaults to false. Codex defaults to `workspace-write`, always uses `approval_policy=never`, and accepts `effort` from `minimal` through `xhigh`; there is no full-access mode. See [docs/interface.md](docs/interface.md) for every parameter.
 
 Every call returns the same kind of report:
 
@@ -200,6 +238,16 @@ added 6 tests. python -m unittest discover -s tests -t . → 7 tests OK.
 
 <sub>Trimmed; the agent's answer is translated from Spanish.</sub> Full reference: [docs/interface.md](docs/interface.md).
 
+### Real-CLI checks
+
+Checked on 2026-11-17 with Windows 11, Claude 2.1.325, Codex CLI 0.167.2, Antigravity 1.5.x and OpenCode:
+
+- `claude_task` created a file, ran only the allowed command and returned an `ok` report; a different command was denied.
+- `codex_task` completed a new task and a follow-up using `session_id`.
+- Codex delegated a bug fix and test to `antigravity_task` with `gemini-3.8-flash-low`; Antigravity fixed it, wrote and ran the test, and Codex then verified the file itself. Total time was 55 seconds.
+- `setup --write` with Codex orchestrating Antigravity and OpenCode against a temporary `CODEX_HOME` registered both servers according to `codex mcp list`.
+- Codex enforced `tool_timeout_sec`: a 20-second setting cut off a 75-second call. OpenCode completed a 130-second MCP call as a client. Multi-minute client timeouts for Claude Code, Cursor and Antigravity were not measured here; Claude Code had already completed Antigravity benchmark tasks of about 8.5 minutes.
+
 ## ⚠️ Limitations
 
 Honest notes from daily use:
@@ -210,6 +258,9 @@ Honest notes from daily use:
 | 🔒 **Antigravity runs no commands by default** | In `accept-edits` mode every command is denied. Only exact strings in `allow_commands` run (no wildcards). Pass the exact test command if you want it to check its own work. |
 | 🎟️ **Cursor Free plan** | It lists many models, but only `auto` and the Grok models actually run. Requests for other models fall back to `auto`, and the report says so. |
 | 🪟 **Cursor through `cmd.exe`** | On Windows the bridge starts Cursor's own `node.exe` directly so prompts arrive intact. If it cannot find that install (for example `CURSOR_AGENT_BIN` points to a launcher outside the install folder), the prompt goes through `cmd.exe`: line breaks are replaced by spaces (the report says so) and `%NAME%` is expanded. |
+| ✅ **Codex MCP approvals** | As an orchestrator, Codex asks before every MCP tool call. Non-interactive `codex exec` with `approval_policy=never` rejects it unless that server's table contains `default_tools_approval_mode = "approve"`. Setup does not set this because it skips a permission prompt; it is your choice. |
+| 🪟 **Codex Windows sandbox** | The sandbox sometimes cannot start PowerShell for a command. Codex retries with cmd; the report keeps the failed attempt as `✗ ... could not run` and adds a note to check that the task is complete. |
+| 🔁 **The nested guard depends on environment forwarding** | A bridge refuses nested `tools/call` at the configured depth only if the executor passes `MCP_AGENT_BRIDGES_DEPTH` to its MCP servers. Task prompts also say not to delegate, and Claude gets no MCP servers unless `use_mcp: true`. |
 | 🧾 **The report is a summary** | It is parsed from each CLI's event stream, whose format can change between versions. Always check the diff and run the tests. |
 | ⏱️ **No real parallelism** | Claude Code tends to run calls to different MCP servers one after another. |
 | 🪟 **Windows-first testing** | CI runs on Linux, macOS and Windows, but the end-to-end runs with the real CLIs were done on Windows 11. |
@@ -222,21 +273,25 @@ Honest notes from daily use:
 Other projects wrap one of these CLIs as an MCP server and are worth a look: [claude-opencode-mcp](https://github.com/putuandy/claude-opencode-mcp), [opencode-mcp](https://github.com/AlaeddineMessadi/opencode-mcp), [cursor-agent-mcp](https://github.com/sailay1996/cursor-agent-mcp), [cursormcp](https://github.com/sitien173/cursormcp), [gemini-mcp-tool](https://github.com/jamubc/gemini-mcp-tool), [Claude-Code-Antigravity-CLI-MCP-Server](https://github.com/SinanTufekci/Claude-Code-Antigravity-CLI-MCP-Server) and [all-agents-mcp](https://github.com/dokkabei97/all-agents-mcp).
 
 What this repo focuses on:
-- the **same parameters and report** across three different CLIs, designed for an orchestrator that verifies results;
-- **per-call model choice with fallbacks**, and **exact-command allow-listing** for Antigravity;
+- the **same parameters and report** across five different CLIs, designed for an orchestrator that verifies results;
+- **per-call model choice with fallbacks**, and **exact-command allow-listing** for Claude and Antigravity;
 - a **reproducible benchmark** with a hidden judge.
 
 ## 🗂️ Repository layout
 
 ```text
 packages/
+├── claude-bridge/server.mjs        MCP server for Claude Code
+├── codex-bridge/server.mjs         MCP server for Codex CLI
 ├── opencode-bridge/server.mjs      MCP server for OpenCode
 ├── cursor-bridge/server.mjs        MCP server for Cursor CLI
 └── antigravity-bridge/server.mjs   MCP server for Antigravity CLI
-bin/cli.mjs                         npx entry point: <opencode|cursor|antigravity>
+bin/cli.mjs                         bridge, setup and doctor entry point
+bin/setup.mjs                       setup planning, file updates and CLI checks
+templates/orchestrator-guide.md     guide rendered for the chosen executors
 benchmark/                          task, hidden judge, prompt and results
 docs/                               configuration and interface reference
-examples/claude.json.example        ready-made MCP config
+examples/claude.json.example        manual Claude Code MCP config
 test/                               tests and event-stream fixtures (no real CLI needed)
 ```
 
@@ -246,9 +301,9 @@ test/                               tests and event-stream fixtures (no real CLI
 npm test
 ```
 
-No real agent CLI is needed. The tests cover the MCP handshake, schemas and error handling of each bridge; the event-stream parsers, against fixtures with each CLI's structure; timeouts and cancellation stopping the whole process tree; multi-line prompts reaching Cursor; and that the plumbing shared by the three files stays identical.
+No real agent CLI is needed. The tests cover the MCP handshake, schemas and error handling of each bridge; event-stream parsers against fixtures; process handling, cancellation and stdin; setup planning and file updates; and the shared plumbing.
 
-Each bridge is one self-contained file on purpose. The process and MCP code they share sits between `// <shared>` markers and must be the same in all three; `test/shared.test.mjs` checks it.
+Each bridge is one self-contained file on purpose. The process and MCP code they share sits between `// <shared>` markers and must be the same in all five; `test/shared.test.mjs` checks it.
 
 Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
 

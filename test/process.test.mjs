@@ -61,6 +61,29 @@ test("a leftover process holding the pipes does not block the call", async () =>
   assert.ok(Date.now() - t0 < 5000, "waited for the leftover process");
 });
 
+test("runProcess sends long multi-line input on stdin intact", async () => {
+  const prefix = "first line\nsecond line\n";
+  const input = prefix + "x".repeat(40000 - prefix.length);
+  const script = "let s='';process.stdin.setEncoding('utf8');process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(String(s.length)))";
+  const r = await runProcess(process.execPath, ["-e", script], { input, timeoutMs: 10000 });
+  assert.equal(r.code, 0);
+  assert.equal(r.out, "40000");
+});
+
+test("runProcess increments the delegation depth in the child environment", async () => {
+  const env = { ...process.env };
+  delete env.MCP_AGENT_BRIDGES_DEPTH;
+  const bridge = new URL("../packages/opencode-bridge/server.mjs", import.meta.url).href;
+  const script = `import { runProcess } from ${JSON.stringify(bridge)}; const r = await runProcess(process.execPath, ["-e", "process.stdout.write(process.env.MCP_AGENT_BRIDGES_DEPTH || '')"]); process.stdout.write(r.out);`;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script], { env, stdio: ["ignore", "pipe", "inherit"] });
+  let out = "";
+  child.stdout.setEncoding("utf8");
+  child.stdout.on("data", (d) => (out += d));
+  const code = await new Promise((res) => child.on("close", res));
+  assert.equal(code, 0);
+  assert.equal(out, "1");
+});
+
 // ---- over MCP, with a fake cursor-agent ----
 function fakeCursor(dir) {
   if (IS_WIN) {
@@ -81,8 +104,8 @@ function fakeCursor(dir) {
   return p;
 }
 
-function session(env) {
-  const child = spawn(process.execPath, [CLI, "cursor"], { env: { ...process.env, ...env }, stdio: ["pipe", "pipe", "inherit"] });
+function session(env, name = "cursor") {
+  const child = spawn(process.execPath, [CLI, name], { env: { ...process.env, ...env }, stdio: ["pipe", "pipe", "inherit"] });
   let buf = "";
   const got = new Map(), waiting = new Map();
   child.stdout.setEncoding("utf8");
@@ -106,6 +129,17 @@ test("initialize negotiates the protocol version", async () => {
   try {
     assert.equal((await s.call(1, "initialize", { protocolVersion: "2024-11-05" })).result.protocolVersion, "2024-11-05");
     assert.equal((await s.call(2, "initialize", { protocolVersion: "1999-01-01" })).result.protocolVersion, "2025-06-18");
+  } finally { s.close(); }
+});
+
+test("nested delegation blocks tools/call but leaves tools/list available", async () => {
+  const s = session({ MCP_AGENT_BRIDGES_DEPTH: "1", OPENCODE_BRIDGE_LOGS: "off" }, "opencode");
+  try {
+    const list = await s.call(1, "tools/list", {});
+    assert.deepEqual(list.result.tools.map((t) => t.name), ["opencode_task"]);
+    const res = await s.call(2, "tools/call", { name: "opencode_task", arguments: { prompt: "noop" } });
+    assert.equal(res.result.isError, true);
+    assert.match(res.result.content[0].text, /nested delegation blocked/);
   } finally { s.close(); }
 });
 

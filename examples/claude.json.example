@@ -3,7 +3,7 @@
     "opencode": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "github:ddzendreros/mcp-agent-bridges", "opencode"],
+      "args": ["-y", "github:ddzendreros/mcp-agent-bridges#v1.2.0", "opencode"],
       "env": {
         "OPENCODE_BRIDGE_MODEL": "opencode/deepseek-v4.1-flash-free"
       }
@@ -11,13 +11,19 @@
     "cursor": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "github:ddzendreros/mcp-agent-bridges", "cursor"],
+      "args": ["-y", "github:ddzendreros/mcp-agent-bridges#v1.2.0", "cursor"],
       "env": {}
     },
     "antigravity": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "github:ddzendreros/mcp-agent-bridges", "antigravity"],
+      "args": ["-y", "github:ddzendreros/mcp-agent-bridges#v1.2.0", "antigravity"],
+      "env": {}
+    },
+    "codex-bridge": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "github:ddzendreros/mcp-agent-bridges#v1.2.0", "codex"],
       "env": {}
     },
     "codex": {

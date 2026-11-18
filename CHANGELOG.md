@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.2.0 — 2026-11-17
+
+### Added
+- `claude-bridge` and `codex-bridge`, exposing `claude_task` and `codex_task` with the same core parameters and report as the existing bridges.
+- `setup`, which registers selected executors for any of the five orchestrators, backs up files before changing them, and writes an orchestrator guide containing only those executors. Codex registrations set `tool_timeout_sec = 1800`.
+- `doctor`, which reports the installed agent CLIs and their versions.
+- A nested-delegation guard using `MCP_AGENT_BRIDGES_DEPTH` and `MCP_AGENT_BRIDGES_MAX_DEPTH`.
+- MCP tool annotations on every tool: `*_task` tools are marked destructive and not read-only; `*_models` tools are marked read-only and idempotent. All are open-world.
+
+### Changed
+- Any of Claude Code, Codex, OpenCode, Cursor or Antigravity can be the orchestrator while the others execute.
+- Claude tasks use `acceptEdits` or read-only `plan`, with an exact command allow-list. Codex tasks use `workspace-write` or `read-only`, with no full-access mode.
+- The shared process and MCP block is now identical across five bridges.
+
+### Fixed
+- Prompts for the new Claude and Codex bridges are sent on stdin, avoiding the Windows argv length limit and `cmd.exe` line-break handling.
+- When started inside Claude Code, the Claude bridge removes inherited `CLAUDE*` and `ANTHROPIC_*` session variables unless named in `CLAUDE_BRIDGE_KEEP_ENV`; inheriting them made nested `claude -p` calls answer “Not logged in”.
+- Codex command reports remove the CLI's shell wrapper and mark Windows sandbox shell-start failures as `could not run`.
+
 ## 1.1.0 — 2026-11-14
 
 ### Fixed

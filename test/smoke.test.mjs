@@ -12,8 +12,8 @@ const CLI = fileURLToPath(new URL("../bin/cli.mjs", import.meta.url));
 const MISSING = join(tmpdir(), "definitely-not-installed-cli");
 const ENV = {
   ...process.env,
-  OPENCODE_BIN: MISSING, CURSOR_AGENT_BIN: MISSING, AGY_BIN: MISSING,
-  OPENCODE_BRIDGE_LOGS: "off", CURSOR_BRIDGE_LOGS: "off", AGY_BRIDGE_LOGS: "off",
+  OPENCODE_BIN: MISSING, CURSOR_AGENT_BIN: MISSING, AGY_BIN: MISSING, CLAUDE_BIN: MISSING, CODEX_BIN: MISSING,
+  OPENCODE_BRIDGE_LOGS: "off", CURSOR_BRIDGE_LOGS: "off", AGY_BRIDGE_LOGS: "off", CLAUDE_BRIDGE_LOGS: "off", CODEX_BRIDGE_LOGS: "off",
 };
 
 function session(name) {
@@ -43,6 +43,8 @@ const CASES = [
   { name: "opencode", task: "opencode_task", tools: ["opencode_task"] },
   { name: "cursor", task: "cursor_task", tools: ["cursor_task", "cursor_models"] },
   { name: "antigravity", task: "antigravity_task", tools: ["antigravity_task", "antigravity_models"] },
+  { name: "claude", task: "claude_task", tools: ["claude_task"] },
+  { name: "codex", task: "codex_task", tools: ["codex_task"] },
 ];
 const COMMON = ["prompt", "cwd", "model", "fallback_models", "session_id", "timeout_s"];
 

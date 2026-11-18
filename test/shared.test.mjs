@@ -1,10 +1,16 @@
-// Each bridge stays a single file, so the process/MCP plumbing is copied into all three. This test
+// Each bridge stays a single file, so the process/MCP plumbing is copied into all of them. This test
 // keeps the copies identical and the versions in step with package.json.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const BRIDGES = ["opencode", "cursor", "antigravity"];
+const BRIDGES = [
+  "opencode",
+  "cursor",
+  "antigravity",
+  "claude",
+  "codex",
+];
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const block = (src) => src.match(/\/\/ <shared>[\s\S]*?\/\/ <\/shared>/)?.[0];
 

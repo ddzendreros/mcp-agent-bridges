@@ -19,6 +19,9 @@ jobs:
       - run: node --check packages/opencode-bridge/server.mjs
       - run: node --check packages/cursor-bridge/server.mjs
       - run: node --check packages/antigravity-bridge/server.mjs
+      - run: node --check packages/claude-bridge/server.mjs
+      - run: node --check packages/codex-bridge/server.mjs
+      - run: node --check bin/setup.mjs
       - run: npm test
   judge:
     runs-on: ubuntu-latest

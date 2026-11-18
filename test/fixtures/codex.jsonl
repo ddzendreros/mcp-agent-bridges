@@ -1,0 +1,14 @@
+{"type":"thread.started","thread_id":"cx-test-1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I'll fix app.py, then run the tests."}}
+{"type":"item.started","item":{"id":"item_1","type":"file_change","changes":[{"path":"/work/app.py","kind":"update"}],"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"file_change","changes":[{"path":"/work/app.py","kind":"update"},{"path":"/work/tests/test_app.py","kind":"add"}],"status":"completed"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"\"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -Command 'python -m pytest -q'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"\"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -Command 'python -m pytest -q'","aggregated_output":"Failed to create unified exec process: CreateProcessAsUserW failed: 5 (Access is denied.) | cwd=/work | env_u16_len=100","exit_code":-1,"status":"failed"}}
+{"type":"item.started","item":{"id":"item_3","type":"command_execution","command":"/bin/bash -lc 'python -m pytest -q'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_3","type":"command_execution","command":"/bin/bash -lc 'python -m pytest -q'","aggregated_output":"1 failed, 2 passed\nFAILED tests/test_app.py::test_f\n","exit_code":1,"status":"failed"}}
+{"type":"item.started","item":{"id":"item_4","type":"mcp_tool_call","server":"docs","tool":"search","arguments":{"q":"pytest"},"result":null,"error":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_4","type":"mcp_tool_call","server":"docs","tool":"search","arguments":{"q":"pytest"},"result":{"content":[{"type":"text","text":"ok"}]},"error":null,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_5","type":"command_execution","command":"\"C:\\Windows\\system32\\cmd.exe\" /c 'python -m pytest -q'","aggregated_output":"3 passed in 0.02s\r\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_6","type":"agent_message","text":"Fixed app.py and added tests. 3 passed."}}
+{"type":"turn.completed","usage":{"input_tokens":1000,"cached_input_tokens":600,"cache_write_input_tokens":0,"output_tokens":120,"reasoning_output_tokens":80}}
